@@ -42,11 +42,11 @@ app:
     capacity: 5
   prompt-parser:
     anthropic-api-key: ${ANTHROPIC_API_KEY:}
-    model: claude-sonnet-4-6-20250514
+    model: claude-sonnet-4-20250514
     timeout: 30s
     max-tokens: 1024
   enrichment:
     anthropic-api-key: ${ANTHROPIC_API_KEY:}
-    model: claude-sonnet-4-6-20250514
+    model: claude-sonnet-4-20250514
     timeout: 30s
     max-tokens: 2048

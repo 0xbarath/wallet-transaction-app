@@ -87,10 +87,13 @@ public class LlmExplainer {
                 log.warn("Empty LLM response for transaction explanation");
                 return Optional.empty();
             }
+            log.debug("Raw LLM response (first 500 chars): {}",
+                    text.substring(0, Math.min(text.length(), 500)));
 
             return parseAndValidate(text, evidence, hints, operation);
         } catch (Exception e) {
             log.warn("LLM explanation failed: {}", e.getMessage());
+            log.debug("LLM explanation exception: {}", e.getClass().getSimpleName(), e);
             return Optional.empty();
         }
     }
@@ -124,7 +127,9 @@ public class LlmExplainer {
         try {
             root = objectMapper.readTree(json);
         } catch (JsonProcessingException e) {
-            log.warn("LLM response is not valid JSON");
+            log.warn("LLM response is not valid JSON: {}", e.getMessage());
+            log.debug("Unparseable response (first 200 chars): {}",
+                    json.substring(0, Math.min(json.length(), 200)));
             return Optional.empty();
         }
 
@@ -133,7 +138,8 @@ public class LlmExplainer {
                 || !root.has("steps") || !root.get("steps").isArray()
                 || !root.has("unknowns") || !root.get("unknowns").isArray()
                 || !root.has("safetyNotes") || !root.get("safetyNotes").isArray()) {
-            log.warn("LLM response does not match required schema");
+            log.warn("LLM response does not match required schema — has summary={}, steps={}, unknowns={}, safetyNotes={}",
+                    root.has("summary"), root.has("steps"), root.has("unknowns"), root.has("safetyNotes"));
             return Optional.empty();
         }
 
@@ -149,9 +155,33 @@ public class LlmExplainer {
             for (Object value : item.fields().values()) {
                 if (value instanceof String s) {
                     extractHexValues(s, knownHexValues);
+                } else if (value instanceof List<?> list) {
+                    for (Object element : list) {
+                        if (element instanceof String s) {
+                            extractHexValues(s, knownHexValues);
+                        }
+                    }
                 }
             }
         }
+        // Second pass: parse ABI-encoded data fields as 32-byte words
+        for (ImmutableEvidenceItem item : evidence) {
+            for (Object value : item.fields().values()) {
+                if (value instanceof String s && s.startsWith("0x") && s.length() > 66) {
+                    parseAbiWords(s, knownHexValues);
+                }
+            }
+        }
+
+        // Derive unpadded 20-byte addresses from zero-padded 32-byte topic values
+        Set<String> derivedAddresses = new HashSet<>();
+        for (String hex : knownHexValues) {
+            if (hex.length() == 66 && hex.startsWith("0x000000000000000000000000")) {
+                derivedAddresses.add("0x" + hex.substring(26));
+            }
+        }
+        knownHexValues.addAll(derivedAddresses);
+
         for (ImmutableProtocolHint hint : hints) {
             knownHexValues.add(hint.address().toLowerCase());
         }
@@ -160,7 +190,8 @@ public class LlmExplainer {
         List<ImmutableExplanationStep> steps = new ArrayList<>();
         for (JsonNode stepNode : root.get("steps")) {
             if (!stepNode.has("text") || !stepNode.has("evidenceIds")) {
-                log.warn("Step missing required fields");
+                log.warn("Step missing required fields — has text={}, has evidenceIds={}",
+                        stepNode.has("text"), stepNode.has("evidenceIds"));
                 return Optional.empty();
             }
 
@@ -170,6 +201,7 @@ public class LlmExplainer {
                 String evidenceId = eid.asText();
                 if (!knownEvidenceIds.contains(evidenceId)) {
                     log.warn("LLM cited non-existent evidence ID: {}", evidenceId);
+                    log.debug("Known evidence IDs: {}", knownEvidenceIds);
                     return Optional.empty();
                 }
                 stepEvidenceIds.add(evidenceId);
@@ -181,6 +213,7 @@ public class LlmExplainer {
             for (String hex : textHexValues) {
                 if (!knownHexValues.contains(hex.toLowerCase())) {
                     log.warn("LLM produced phantom address/hash: {}", hex);
+                    log.debug("Known hex values ({}): {}", knownHexValues.size(), knownHexValues);
                     return Optional.empty();
                 }
             }
@@ -208,6 +241,7 @@ public class LlmExplainer {
         for (String hex : summaryHex) {
             if (!knownHexValues.contains(hex.toLowerCase())) {
                 log.warn("LLM produced phantom address in summary: {}", hex);
+                log.debug("Known hex values ({}): {}", knownHexValues.size(), knownHexValues);
                 return Optional.empty();
             }
         }
@@ -224,6 +258,17 @@ public class LlmExplainer {
         Matcher matcher = HEX_ADDRESS_PATTERN.matcher(text);
         while (matcher.find()) {
             target.add(matcher.group().toLowerCase());
+        }
+    }
+
+    private static void parseAbiWords(String hexData, Set<String> target) {
+        String hex = hexData.substring(2); // strip "0x"
+        for (int i = 0; i + 64 <= hex.length(); i += 64) {
+            String word = "0x" + hex.substring(i, i + 64);
+            target.add(word.toLowerCase());
+            if (word.startsWith("0x000000000000000000000000") && !word.equals("0x" + "0".repeat(64))) {
+                target.add(("0x" + hex.substring(i + 24, i + 64)).toLowerCase());
+            }
         }
     }
 }

@@ -13,7 +13,7 @@ public record EnrichmentProperties(
         int maxTokens
 ) {
     public EnrichmentProperties {
-        if (model == null || model.isBlank()) model = "claude-sonnet-4-6-20250514";
+        if (model == null || model.isBlank()) model = "claude-sonnet-4-20250514";
         if (timeout == null) timeout = Duration.ofSeconds(30);
         if (maxTokens <= 0) maxTokens = 2048;
     }

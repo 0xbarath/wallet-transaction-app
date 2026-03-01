@@ -7,6 +7,8 @@ spring:
       ddl-auto: validate
 
 app:
+  anthropic:
+    base-url: http://localhost:${wiremock.server.port}
   alchemy:
     rpc-url: http://localhost:${wiremock.server.port}/alchemy
     api-key: test-key

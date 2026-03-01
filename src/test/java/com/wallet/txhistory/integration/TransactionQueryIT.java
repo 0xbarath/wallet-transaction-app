@@ -1,5 +1,6 @@
 package com.wallet.txhistory.integration;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,21 +64,47 @@ class TransactionQueryIT extends BaseIntegrationTest {
     }
 
     @Test
-    void queryReturnsTransfers() throws Exception {
+    void queryReturnsTransfersWithAllFields() throws Exception {
         mockMvc.perform(get("/v1/transactions")
                         .header(AUTH_HEADER, AUTH_VALUE)
                         .param("walletId", walletId)
                         .param("limit", "10"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items").isArray());
+                .andExpect(jsonPath("$.items").isArray())
+                .andExpect(jsonPath("$.querySpec.walletId").value(walletId))
+                .andExpect(jsonPath("$.querySpec.sort").value("createdAt_desc"))
+                .andExpect(jsonPath("$.querySpec.limit").value(10))
+                .andExpect(jsonPath("$.items[0].id").isNotEmpty())
+                .andExpect(jsonPath("$.items[0].walletId").value(walletId))
+                .andExpect(jsonPath("$.items[0].network").value("eth-mainnet"))
+                .andExpect(jsonPath("$.items[0].hash").isNotEmpty())
+                .andExpect(jsonPath("$.items[0].direction").isNotEmpty())
+                .andExpect(jsonPath("$.items[0].asset").isNotEmpty())
+                .andExpect(jsonPath("$.items[0].category").isNotEmpty())
+                .andExpect(jsonPath("$.items[0].createdAt").isNotEmpty());
     }
 
     @Test
     void queryWithPaginationWorks() throws Exception {
-        mockMvc.perform(get("/v1/transactions")
+        String firstPageResponse = mockMvc.perform(get("/v1/transactions")
                         .header(AUTH_HEADER, AUTH_VALUE)
                         .param("walletId", walletId)
                         .param("limit", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isArray())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.nextCursor").isNotEmpty())
+                .andReturn().getResponse().getContentAsString();
+
+        // Use cursor from first page to fetch second page
+        JsonNode firstPage = objectMapper.readTree(firstPageResponse);
+        String cursor = firstPage.get("nextCursor").asText();
+
+        mockMvc.perform(get("/v1/transactions")
+                        .header(AUTH_HEADER, AUTH_VALUE)
+                        .param("walletId", walletId)
+                        .param("limit", "1")
+                        .param("cursor", cursor))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items").isArray())
                 .andExpect(jsonPath("$.items.length()").value(1));
@@ -92,5 +119,24 @@ class TransactionQueryIT extends BaseIntegrationTest {
                         .param("limit", "50"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items").isArray());
+    }
+
+    @Test
+    void queryWithDirectionFilter() throws Exception {
+        mockMvc.perform(get("/v1/transactions")
+                        .header(AUTH_HEADER, AUTH_VALUE)
+                        .param("walletId", walletId)
+                        .param("direction", "OUT")
+                        .param("limit", "50"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isArray())
+                .andExpect(jsonPath("$.querySpec.direction").value("OUT"));
+    }
+
+    @Test
+    void queryMissingWalletIdReturns400() throws Exception {
+        mockMvc.perform(get("/v1/transactions")
+                        .header(AUTH_HEADER, AUTH_VALUE))
+                .andExpect(status().isBadRequest());
     }
 }

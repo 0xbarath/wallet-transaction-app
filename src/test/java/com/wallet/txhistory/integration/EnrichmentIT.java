@@ -54,7 +54,13 @@ class EnrichmentIT extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.status").value("ENRICHED"))
                 .andExpect(jsonPath("$.operation.name").value("aave_supply"))
                 .andExpect(jsonPath("$.protocolHints").isArray())
-                .andExpect(jsonPath("$.evidence").isArray());
+                .andExpect(jsonPath("$.evidence").isArray())
+                .andExpect(jsonPath("$.evidence").isNotEmpty())
+                .andExpect(jsonPath("$.explanation.summary").isNotEmpty())
+                .andExpect(jsonPath("$.explanation.steps").isArray())
+                .andExpect(jsonPath("$.explanation.steps").isNotEmpty())
+                .andExpect(jsonPath("$.explanation.steps[0].text").isNotEmpty())
+                .andExpect(jsonPath("$.explanation.steps[0].evidenceIds").isArray());
     }
 
     @Test
@@ -66,7 +72,9 @@ class EnrichmentIT extends BaseIntegrationTest {
                         .content("""
                                 {"txHash":"0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"}
                                 """))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.detail").isNotEmpty());
     }
 
     @Test
@@ -78,7 +86,9 @@ class EnrichmentIT extends BaseIntegrationTest {
                         .content("""
                                 {"txHash":"0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"}
                                 """))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.detail").isNotEmpty());
     }
 
     @Test
@@ -93,7 +103,9 @@ class EnrichmentIT extends BaseIntegrationTest {
                                 {"txHash":"0x0000000000000000000000000000000000000000000000000000000000000000","network":"eth-mainnet"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("FAILED"));
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.txHash").value("0x0000000000000000000000000000000000000000000000000000000000000000"))
+                .andExpect(jsonPath("$.network").value("eth-mainnet"));
     }
 
     @Test

@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import java.nio.charset.StandardCharsets;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -30,6 +31,10 @@ class PromptQueryIT extends BaseIntegrationTest {
                 .readAllBytes(), StandardCharsets.UTF_8);
         String empty = new String(getClass().getResourceAsStream("/wiremock/alchemy-transfers-empty.json")
                 .readAllBytes(), StandardCharsets.UTF_8);
+        String anthropicOutEth = new String(getClass().getResourceAsStream("/wiremock/anthropic-prompt-parse-outgoing-eth.json")
+                .readAllBytes(), StandardCharsets.UTF_8);
+        String anthropicUsdc = new String(getClass().getResourceAsStream("/wiremock/anthropic-prompt-parse-usdc.json")
+                .readAllBytes(), StandardCharsets.UTF_8);
 
         wireMock.stubFor(WireMock.post(urlPathEqualTo("/alchemy"))
                 .inScenario("prompt-setup")
@@ -41,6 +46,19 @@ class PromptQueryIT extends BaseIntegrationTest {
                 .inScenario("prompt-setup")
                 .whenScenarioStateIs("done")
                 .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody(empty)));
+
+        // Anthropic stubs for prompt parsing
+        wireMock.stubFor(WireMock.post(urlPathEqualTo("/v1/messages"))
+                .withRequestBody(containing("outgoing"))
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(anthropicOutEth)));
+
+        wireMock.stubFor(WireMock.post(urlPathEqualTo("/v1/messages"))
+                .withRequestBody(containing("USDC"))
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(anthropicUsdc)));
 
         String walletResponse = mockMvc.perform(post("/v1/wallets")
                         .header(AUTH_HEADER, AUTH_VALUE)
@@ -71,7 +89,9 @@ class PromptQueryIT extends BaseIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items").isArray())
                 .andExpect(jsonPath("$.querySpec").isNotEmpty())
-                .andExpect(jsonPath("$.querySpec.direction").value("OUT"));
+                .andExpect(jsonPath("$.querySpec.walletId").value(walletId))
+                .andExpect(jsonPath("$.querySpec.direction").value("OUT"))
+                .andExpect(jsonPath("$.querySpec.sort").value("createdAt_desc"));
     }
 
     @Test
@@ -83,6 +103,30 @@ class PromptQueryIT extends BaseIntegrationTest {
                                 {"walletId":"%s","prompt":"show USDC transfers"}
                                 """, walletId)))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isArray())
+                .andExpect(jsonPath("$.querySpec.walletId").value(walletId))
                 .andExpect(jsonPath("$.querySpec.assets[0]").value("USDC"));
+    }
+
+    @Test
+    void promptQueryWithMissingPromptReturns400() throws Exception {
+        mockMvc.perform(post("/v1/transactions:query")
+                        .header(AUTH_HEADER, AUTH_VALUE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.format("""
+                                {"walletId":"%s"}
+                                """, walletId)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void promptQueryWithMissingWalletIdReturns400() throws Exception {
+        mockMvc.perform(post("/v1/transactions:query")
+                        .header(AUTH_HEADER, AUTH_VALUE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"prompt":"show outgoing ETH transfers"}
+                                """))
+                .andExpect(status().isBadRequest());
     }
 }

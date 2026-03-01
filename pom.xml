@@ -22,6 +22,7 @@
         <springdoc.version>2.8.0</springdoc.version>
         <wiremock.version>3.5.4</wiremock.version>
         <immutables.version>2.10.1</immutables.version>
+        <surefire.excludedGroups>live</surefire.excludedGroups>
     </properties>
 
     <dependencies>
@@ -142,6 +143,14 @@
                             <version>${immutables.version}</version>
                         </path>
                     </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <excludedGroups>${surefire.excludedGroups}</excludedGroups>
+                    <argLine>-XX:+EnableDynamicAgentLoading</argLine>
                 </configuration>
             </plugin>
             <plugin>

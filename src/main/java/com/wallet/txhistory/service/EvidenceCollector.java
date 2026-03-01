@@ -26,7 +26,7 @@ public class EvidenceCollector {
 
     private static final Logger log = LoggerFactory.getLogger(EvidenceCollector.class);
     private static final int MAX_LOGS = 50;
-    private static final int MAX_DATA_LENGTH = 256;
+    private static final int MAX_DATA_LENGTH = 1024;
 
     private final AlchemyFeignClient alchemyClient;
     private final TransferRepository transferRepository;

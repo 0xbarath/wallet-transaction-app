@@ -81,7 +81,10 @@ class SyncIT extends BaseIntegrationTest {
                                 {"lookbackDays":30}
                                 """))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.walletId").value(walletId))
                 .andExpect(jsonPath("$.status").value("completed"))
-                .andExpect(jsonPath("$.transfersSynced").isNumber());
+                .andExpect(jsonPath("$.transfersSynced").isNumber())
+                .andExpect(jsonPath("$.lastSyncedBlock").isNumber())
+                .andExpect(jsonPath("$.lastSyncedAt").isNotEmpty());
     }
 }

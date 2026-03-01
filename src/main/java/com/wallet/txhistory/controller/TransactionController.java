@@ -17,7 +17,6 @@ import com.wallet.txhistory.filter.RbacFilter;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,7 +26,6 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/v1/transactions")
 @Tag(name = "Transactions", description = "Transaction history queries")
 public class TransactionController {
 
@@ -39,7 +37,7 @@ public class TransactionController {
         this.promptParserService = promptParserService;
     }
 
-    @GetMapping
+    @GetMapping("/v1/transactions")
     @Operation(summary = "Query transactions with filters")
     public PageResponse<TransferResponse> query(
             @RequestParam UUID walletId,
@@ -76,7 +74,7 @@ public class TransactionController {
         return queryService.query(spec, role);
     }
 
-    @PostMapping(":query")
+    @PostMapping("/v1/transactions:query")
     @Operation(summary = "Query transactions with natural language prompt")
     public PageResponse<TransferResponse> promptQuery(
             @Valid @RequestBody PromptQueryRequest request,

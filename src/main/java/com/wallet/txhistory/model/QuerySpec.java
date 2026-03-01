@@ -1,5 +1,6 @@
 package com.wallet.txhistory.model;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.wallet.txhistory.dto.WalletStyle;
 import org.immutables.value.Value;
 
@@ -11,6 +12,7 @@ import java.util.UUID;
 
 @Value.Immutable
 @WalletStyle
+@JsonDeserialize(as = ImmutableQuerySpec.class)
 public interface QuerySpec {
     int DEFAULT_LIMIT = 50;
     int MAX_LIMIT = 200;

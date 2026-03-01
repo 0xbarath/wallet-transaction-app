@@ -129,6 +129,77 @@ class EvidenceValidationTest {
         assertThat(result).isEmpty();
     }
 
+    @Test
+    void acceptsAddressFromAbiEncodedDataField() {
+        // Data field with two 32-byte words: zero-padded USDC address + zero-padded recipient
+        String abiData = "0x"
+                + "000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"  // USDC
+                + "000000000000000000000000dead0001dead0001dead0001dead0001dead0001";  // recipient
+        List<ImmutableEvidenceItem> abiEvidence = List.of(
+                ImmutableEvidenceItem.builder()
+                        .id("ev:tx")
+                        .type("tx")
+                        .fields(Map.of("from", "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                       "to", "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"))
+                        .build(),
+                ImmutableEvidenceItem.builder()
+                        .id("ev:log:0")
+                        .type("log")
+                        .fields(Map.of("address", "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                                       "data", abiData))
+                        .build()
+        );
+
+        // LLM mentions the address from the *second* ABI word
+        String llmResponse = """
+                {
+                  "summary": "Transfer to 0xdead0001dead0001dead0001dead0001dead0001",
+                  "steps": [{"text": "Tokens sent to 0xdead0001dead0001dead0001dead0001dead0001", "evidenceIds": ["ev:log:0"]}],
+                  "unknowns": [],
+                  "safetyNotes": []
+                }""";
+        mockAnthropicResponse(llmResponse);
+
+        Optional<ImmutableExplanation> result = explainer.explain(abiEvidence, hints, operation);
+
+        assertThat(result).isPresent();
+    }
+
+    @Test
+    void rejectsPhantomAddressNotInAbiData() {
+        // Data field with one 32-byte word
+        String abiData = "0x"
+                + "000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
+        List<ImmutableEvidenceItem> abiEvidence = List.of(
+                ImmutableEvidenceItem.builder()
+                        .id("ev:tx")
+                        .type("tx")
+                        .fields(Map.of("from", "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                       "to", "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"))
+                        .build(),
+                ImmutableEvidenceItem.builder()
+                        .id("ev:log:0")
+                        .type("log")
+                        .fields(Map.of("address", "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                                       "data", abiData))
+                        .build()
+        );
+
+        // LLM mentions an address NOT in any ABI word
+        String llmResponse = """
+                {
+                  "summary": "Transfer to 0xdead0001dead0001dead0001dead0001dead0001",
+                  "steps": [{"text": "Tokens sent to 0xdead0001dead0001dead0001dead0001dead0001", "evidenceIds": ["ev:log:0"]}],
+                  "unknowns": [],
+                  "safetyNotes": []
+                }""";
+        mockAnthropicResponse(llmResponse);
+
+        Optional<ImmutableExplanation> result = explainer.explain(abiEvidence, hints, operation);
+
+        assertThat(result).isEmpty();
+    }
+
     private void mockAnthropicResponse(String text) {
         AnthropicResponse response = new AnthropicResponse(
                 "msg-123", "message", "claude-sonnet-4-6-20250514", "end_turn",

@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 @FeignClient(
         name = "anthropic",
-        url = "https://api.anthropic.com",
+        url = "${app.anthropic.base-url:https://api.anthropic.com}",
         configuration = AnthropicFeignConfig.class
 )
 public interface AnthropicFeignClient {

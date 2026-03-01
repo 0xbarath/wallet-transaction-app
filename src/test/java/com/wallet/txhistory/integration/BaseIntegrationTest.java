@@ -39,6 +39,8 @@ public abstract class BaseIntegrationTest {
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("app.alchemy.rpc-url", () -> wireMock.baseUrl() + "/alchemy");
         registry.add("app.alchemy.api-key", () -> "test-key");
+        registry.add("app.anthropic.base-url", wireMock::baseUrl);
+        registry.add("app.prompt-parser.anthropic-api-key", () -> "test-api-key");
         registry.add("app.enrichment.anthropic-api-key", () -> "test-api-key");
     }
 
