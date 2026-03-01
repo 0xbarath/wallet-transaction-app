@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: jdbc:tc:postgresql:16-alpine:///walletdb
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+app:
+  alchemy:
+    rpc-url: http://localhost:${wiremock.server.port}/alchemy
+    api-key: test-key
+    timeout: 5s
+    retry-max-attempts: 1
+  prompt-parser:
+    anthropic-api-key: test-api-key
+    model: claude-sonnet-4-6-20250514
+    timeout: 5s
+    max-tokens: 1024
