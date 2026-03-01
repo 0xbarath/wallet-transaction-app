@@ -11,6 +11,7 @@
 - [7. Protocol Context — Adding and Extending Protocol Knowledge](#7-protocol-context--adding-and-extending-protocol-knowledge)
 - [8. Future Improvements / Tech Debt](#8-future-improvements--tech-debt)
 - [9. Vector Database & Embeddings](#9-vector-database--embeddings)
+- [10. Known Issues](#10-known-issues)
 
 ---
 
@@ -812,3 +813,27 @@ LIMIT :k;
 | `PromptParserService` — NL parsing | **No** | — | Small fixed schema, hardcoded few-shots suffice |
 | `EvidenceCollector` — evidence assembly | **No** | — | Deterministic on-chain data, not a retrieval problem |
 | `address_labels` ingestion | **No** | — | Data pipeline problem, not a retrieval problem |
+
+---
+
+## 10. Known Issues
+
+### 10.1 — Stale `ESTIMATED_CURRENT_BLOCK` constant
+
+**Location:** `SyncService.java:44` — hardcoded to `19_000_000L`
+
+`computeFromBlock()` uses this constant when the caller provides `startTime` or `lookbackDays` to estimate which block number corresponds to a point in time. The value was approximately correct around January 2024 but is now ~2 million blocks behind the actual chain head.
+
+**Impact:** A "30-day lookback" actually reaches months further back than the user intended, pulling far more history than expected.
+
+**Fix:** Replace the constant with a dynamic `eth_blockNumber` RPC call via `AlchemyFeignClient.callGeneric()` and cache the result for ~60 seconds to avoid per-request overhead.
+
+### 10.2 — Unbounded Alchemy fetch loop
+
+**Location:** `SyncService.fetchTransfers():194-212` — `do/while (pageKey != null)` with no page cap
+
+The pagination loop continues until Alchemy stops returning a `pageKey`. For high-activity wallets (exchange hot wallets, popular contracts) this can mean hundreds of thousands of transfers, leading to unbounded memory consumption and API call volume.
+
+**Impact:** A single sync for a high-activity wallet can exhaust Alchemy rate limits or cause OOM errors.
+
+**Fix:** Introduce an `app.alchemy.max-pages` configuration property (default 100) and break out of the loop when the limit is reached.
