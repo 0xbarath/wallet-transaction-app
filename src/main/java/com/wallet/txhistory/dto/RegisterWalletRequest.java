@@ -3,6 +3,7 @@ package com.wallet.txhistory.dto;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import org.immutables.value.Value;
 
 import javax.annotation.Nullable;
@@ -18,5 +19,5 @@ public interface RegisterWalletRequest {
     @Pattern(regexp = "^[a-z0-9-]+$", message = "Invalid network identifier")
     @Value.Default default String network() { return "eth-mainnet"; }
 
-    @Nullable String label();
+    @Nullable @Size(max = 100) String label();
 }

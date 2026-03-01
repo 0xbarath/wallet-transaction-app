@@ -837,3 +837,25 @@ The pagination loop continues until Alchemy stops returning a `pageKey`. For hig
 **Impact:** A single sync for a high-activity wallet can exhaust Alchemy rate limits or cause OOM errors.
 
 **Fix:** Introduce an `app.alchemy.max-pages` configuration property (default 100) and break out of the loop when the limit is reached.
+
+### 10.3 — Alchemy Retryer is dead code
+
+**Location:** `AlchemyFeignConfig.java:24-29` — `ErrorDecoder` always returns `AlchemyApiException`, never `RetryableException`
+
+Feign's `Retryer` (line 20-21) only triggers on `RetryableException`. Because the `ErrorDecoder` never returns one, the Retryer can never fire. This means 429 rate-limit responses and 5xx server errors from Alchemy immediately fail instead of retrying.
+
+Compare with `AnthropicFeignConfig.java:47-54` which correctly returns `RetryableException` for retryable status codes.
+
+**Impact:** Transient Alchemy outages or rate-limit responses cause immediate sync failures with no retry, even though a Retryer is configured.
+
+**Fix:** Return `RetryableException` from the `ErrorDecoder` when `status == 429 || status >= 500`.
+
+### 10.4 — Uncaught `NumberFormatException` in `EvidenceCollector.hexToInt()`
+
+**Location:** `EvidenceCollector.java:172-178` — `Integer.parseInt()` with no try-catch
+
+`hexToInt()` parses the `logIndex` field from RPC JSON using `Integer.parseInt(hex, 16)`. If the RPC response contains a malformed or unexpected `logIndex` value, `parseInt` throws an uncaught `NumberFormatException` that propagates up and crashes the entire evidence-collection flow for that transaction.
+
+**Impact:** A single malformed `logIndex` in any log entry aborts evidence collection for the whole transaction, causing the explain endpoint to return degraded results.
+
+**Fix:** Wrap `Integer.parseInt()` in a try-catch and return `0` on `NumberFormatException`.

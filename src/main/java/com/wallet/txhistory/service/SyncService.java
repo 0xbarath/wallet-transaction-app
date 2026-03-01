@@ -103,7 +103,7 @@ public class SyncService {
 
             // Track max block
             for (Transfer t : allTransfers) {
-                if (t.getBlockNum() > maxBlock) {
+                if (t.getBlockNum() != null && t.getBlockNum() > maxBlock) {
                     maxBlock = t.getBlockNum();
                 }
             }
@@ -123,8 +123,8 @@ public class SyncService {
                     .walletId(walletId)
                     .status("completed")
                     .transfersSynced(inserted)
-                    .lastSyncedBlock(updated.getLastSyncedBlock())
-                    .lastSyncedAt(updated.getLastSyncedAt())
+                    .lastSyncedBlock(updated != null ? updated.getLastSyncedBlock() : null)
+                    .lastSyncedAt(updated != null ? updated.getLastSyncedAt() : null)
                     .build();
         } catch (Exception e) {
             releaseSyncLock(walletId, null);
@@ -174,21 +174,17 @@ public class SyncService {
 
     @Transactional
     protected WalletSyncState releaseSyncLock(UUID walletId, Long maxBlock) {
-        try {
-            WalletSyncState state = syncStateRepository.findById(walletId).orElse(null);
-            if (state == null) {
-                return null;
-            }
-            state.setSyncInProgress(false);
-            if (maxBlock != null) {
-                state.setLastSyncedBlock(maxBlock);
-                state.setLastSyncedAt(OffsetDateTime.now());
-            }
-            return syncStateRepository.save(state);
-        } catch (Exception ex) {
-            log.error("Failed to release sync lock for wallet {}", walletId, ex);
+        WalletSyncState state = syncStateRepository.findById(walletId).orElse(null);
+        if (state == null) {
+            log.warn("No sync state found for wallet {} during lock release", walletId);
             return null;
         }
+        state.setSyncInProgress(false);
+        if (maxBlock != null) {
+            state.setLastSyncedBlock(maxBlock);
+            state.setLastSyncedAt(OffsetDateTime.now());
+        }
+        return syncStateRepository.save(state);
     }
 
     private List<Transfer> fetchTransfers(Wallet wallet, Direction direction, String fromBlock, String toBlock) {

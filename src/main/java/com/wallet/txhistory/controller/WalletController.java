@@ -59,7 +59,7 @@ public class WalletController {
     @ApiResponse(responseCode = "409", description = "Sync already in progress")
     @ApiResponse(responseCode = "429", description = "Rate limit exceeded")
     public SyncResponse sync(@PathVariable UUID walletId,
-                              @RequestBody(required = false) SyncRequest request) {
+                              @Valid @RequestBody(required = false) SyncRequest request) {
         return syncService.sync(walletId, request);
     }
 }

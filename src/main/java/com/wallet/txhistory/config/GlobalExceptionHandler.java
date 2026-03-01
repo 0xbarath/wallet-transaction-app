@@ -1,5 +1,6 @@
 package com.wallet.txhistory.config;
 
+import jakarta.validation.ConstraintViolationException;
 import com.wallet.txhistory.exception.AlchemyApiException;
 import com.wallet.txhistory.exception.DuplicateWalletException;
 import com.wallet.txhistory.exception.ForbiddenCategoryException;
@@ -64,13 +65,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AlchemyApiException.class)
     public ProblemDetail handleAlchemyApi(AlchemyApiException e) {
         log.error("Alchemy API error", e);
-        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, "External API error: " + e.getMessage());
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, "External API error");
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ProblemDetail handleUnreadableMessage(HttpMessageNotReadableException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
-                "Malformed JSON request body: " + e.getMostSpecificCause().getMessage());
+                "Malformed JSON request body");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -78,6 +79,15 @@ public class GlobalExceptionHandler {
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed");
         detail.setProperty("errors", e.getFieldErrors().stream()
                 .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
+                .toList());
+        return detail;
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ProblemDetail handleConstraintViolation(ConstraintViolationException e) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed");
+        detail.setProperty("errors", e.getConstraintViolations().stream()
+                .map(v -> v.getPropertyPath() + ": " + v.getMessage())
                 .toList());
         return detail;
     }

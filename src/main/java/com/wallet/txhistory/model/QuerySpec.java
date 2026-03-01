@@ -37,8 +37,16 @@ public interface QuerySpec {
         int normalizedLimit = limit();
         if (normalizedLimit <= 0) normalizedLimit = DEFAULT_LIMIT;
         if (normalizedLimit > MAX_LIMIT) normalizedLimit = MAX_LIMIT;
-        if (normalizedLimit != limit()) {
-            return ImmutableQuerySpec.copyOf(this).withLimit(normalizedLimit);
+
+        String normalizedSort = sort();
+        if (!SORT_CREATED_AT_DESC.equals(normalizedSort) && !SORT_CREATED_AT_ASC.equals(normalizedSort)) {
+            normalizedSort = SORT_CREATED_AT_DESC;
+        }
+
+        if (normalizedLimit != limit() || !normalizedSort.equals(sort())) {
+            return ImmutableQuerySpec.copyOf(this)
+                    .withLimit(normalizedLimit)
+                    .withSort(normalizedSort);
         }
         return this;
     }
